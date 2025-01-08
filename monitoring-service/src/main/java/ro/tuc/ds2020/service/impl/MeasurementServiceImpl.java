@@ -12,6 +12,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import static org.thymeleaf.util.StringUtils.length;
+
 @Service
 public class MeasurementServiceImpl implements MeasurementService {
     private final MeasurementRepository measurementRepository;
@@ -30,7 +32,9 @@ public class MeasurementServiceImpl implements MeasurementService {
 
     @Override
     public List<MeasurementDTO> getAllMeasurementsForDeviceByDay(UUID uuid, LocalDate date) {
+        System.out.println("SUNT AICI++++++++++++++++++");
         List<Measurement> measurements = measurementRepository.findByDeviceUuidAndTimestampBetween(uuid, date.atTime(0, 0, 0), date.atTime(23,59,59));
+        System.out.println(length(measurements));
         return measurements.stream().map(measurementMapper::toDTO).collect(java.util.stream.Collectors.toList());
     }
 

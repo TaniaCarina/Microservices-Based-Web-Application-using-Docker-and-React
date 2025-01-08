@@ -1,20 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import SockJS from 'sockjs-client';
-import { Stomp } from 'stompjs';
-
+import { Client } from '@stomp/stompjs';
+import Stomp from "stompjs";
 
 Chart.register(...registerables);
 
-const DeviceChart = (props) => {
+const DeviceChart = () => {
     const [measurements, setMeasurements] = useState([]);
     const [date, setDate] = useState(null);
     const [hourlyDifferences, setHourlyDifferences] = useState([]);
-    const deviceUuid = window.location.href.split('/')[window.location.href.split('/').length - 1];
+    const deviceUuid = window.location.href.split('/').slice(-1)[0];
     const chartRef = useRef(null);
-    const chartInstanceRef = useRef(null); // Reference for the chart instance
-    const [stompClient, setStompClient] = useState(null);
-
+    const chartInstanceRef = useRef(null);
+    const clientRef = useRef(null);
 
     useEffect(() => {
         if (date) {
@@ -27,127 +26,108 @@ const DeviceChart = (props) => {
     }, [measurements]);
 
     useEffect(() => {
-        console.log("measurements");
-        console.log(measurements);
-    }, [measurements]);
+        return () => {
+            if (clientRef.current) {
+                clientRef.current.deactivate();
+            }
+        };
+    }, []);
 
-    const getNewMeasurements = () => {
-      const dateObj = new Date(date);
-      const formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-  
-      const socket = new SockJS("http://localhost:8082/measurements");
-      const client = Stomp.over(socket);
-  
-      client.connect({}, () => {
+ 
+const getNewMeasurements = () => {
+  const dateObj = new Date(date);
+  const formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+
+  const client = new Client({
+      brokerURL: "ws://localhost:8082/measurements",  // Adjust URL if necessary
+      connectHeaders: {},
+      onConnect: () => {
           client.subscribe("/topic/measurements", (message) => {
               const receivedMessage = JSON.parse(message.body);
               setMeasurements(receivedMessage);
-              updateHourlyDifferences();
           });
-  
-          // Trimiterea unui mesaj la server pentru a solicita măsurători
-          client.send("/app/sendMeasurement", {}, JSON.stringify({
-              deviceUuid: deviceUuid,
-              date: formattedDate
-          }));
-      });
-  
-      setStompClient(client);
-  };
-  
 
-      //   console.log(formattedDate);
-      //  // fetch(`http://localhost:8082/measurements-by-day/${deviceUuid}/${formattedDate}`, {
-      //       method: 'GET'
-      //   })
-      //   .then(res => res.json())
-      //   .then(data => {
-      //       setMeasurements(data);
-      //       updateHourlyDifferences();
-      //   })
-      //   .catch(err => console.log(err));
-    //};
-  
+          client.publish({
+              destination: "/app/sendMeasurement",
+              body: JSON.stringify({
+                  deviceUuid: deviceUuid,
+                  date: formattedDate,
+              }),
+          });
+      },
+      // Add handlers for other client events as needed
+  });
+
+  client.activate();
+  clientRef.current = client;
+};
+
     const updateHourlyDifferences = () => {
-        const hourlyDiff = {};
-
-        for (let i = 0; i < 24; i++) {
-          hourlyDiff[i] = [];
-        }
+        const hourlyDiff = Array(24).fill(0).map(() => []);
 
         measurements.forEach((measurement) => {
-          const timestamp = new Date(measurement.timestamp);
-          const hour = timestamp.getHours();
-    
-          hourlyDiff[hour].push(measurement.value);
+            const timestamp = new Date(measurement.timestamp);
+            const hour = timestamp.getHours();
+            hourlyDiff[hour].push(measurement.value);
         });
 
-        const hourlyDifferencesData = [];
-
-        for (let i = 0; i < 24; i++) {
-          const values = hourlyDiff[i];
-          if (values.length >= 2) {
-            const hourlyDiffValue = values[values.length - 1] - values[0];
-            hourlyDifferencesData.push(hourlyDiffValue);
-          } else {
-            hourlyDifferencesData.push(0);
-          }
-        }
+        const hourlyDifferencesData = hourlyDiff.map(values => {
+            return values.length >= 2 ? values[values.length - 1] - values[0] : 0;
+        });
 
         const chartData = {
           labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
-          datasets: [{
-              label: 'Hourly Differences',
-              data: hourlyDifferencesData,
-              backgroundColor: 'rgba(75, 192, 192, 0.6)',
-              borderColor: 'rgba(75, 192, 192, 1)',
-              borderWidth: 1,
-          }],
+            datasets: [{
+                label: 'Hourly Differences',
+                data: hourlyDifferencesData,
+                backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1,
+            }],
         };
 
         setHourlyDifferences(chartData);
     };
-  
+
     useEffect(() => {
-      // Clean up the previous chart before drawing a new one
-      if (chartInstanceRef.current) {
-          chartInstanceRef.current.destroy();
-      }
+        if (chartInstanceRef.current) {
+            chartInstanceRef.current.destroy();
+        }
 
-      if (chartRef.current && hourlyDifferences.labels && hourlyDifferences.datasets) {
-        const newChartInstance = new Chart(chartRef.current, {
-          type: 'bar',
-          data: hourlyDifferences,
-          options: {
-            responsive: true,
-            scales: {
-              x: {
-                title: {
-                  display: true,
-                  text: 'Hour',
+        if (chartRef.current && hourlyDifferences.labels && hourlyDifferences.datasets) {
+            const newChartInstance = new Chart(chartRef.current, {
+                type: 'bar',
+                data: hourlyDifferences,
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Hour',
+                            },
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Hourly Differences',
+                            },
+                        },
+                    },
                 },
-              },
-              y: {
-                title: {
-                  display: true,
-                  text: 'Hourly Differences',
-                },
-              },
-            },
-          },
-        });
+            });
 
-        chartInstanceRef.current = newChartInstance; // Update the ref with the new chart instance
-      }
+            chartInstanceRef.current = newChartInstance;
+        }
     }, [hourlyDifferences]);
 
     return (
         <div style={{ padding: '24px' }}>
-          <label htmlFor="datePicker">Pick a date: </label>
-          <input type="date" id="datePicker" value={date} onChange={(e) => setDate(e.target.value)} />
-          <canvas ref={chartRef} width="400" height="200"></canvas>
+            <label htmlFor="datePicker">Pick a date: </label>
+            <input type="date" id="datePicker" value={date || ''} onChange={(e) => setDate(e.target.value)} />
+            <canvas ref={chartRef} width="400" height="200"></canvas>
         </div>
     );
-}
+};
 
 export default DeviceChart;

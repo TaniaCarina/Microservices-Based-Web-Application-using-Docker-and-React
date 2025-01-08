@@ -4,7 +4,6 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import NavigationBar from "./navigation-bar";
 import Home from "./home/home";
 import UserContainer from "./user/user-container";
-import WebSocketComponent from "./user/components/WebSocketComponent.js";
 import DeviceContainer from "./device/device-container";
 import ErrorPage from "./commons/errorhandling/error-page";
 import styles from "./commons/styles/project-style.css";
@@ -30,7 +29,6 @@ function App() {
   return (
     <div className={styles.back}>
       <Router>
-        <WebSocketComponent />
         <NavigationBar />
         <Routes>
           {renderRoute("/", <Home />, null)}
