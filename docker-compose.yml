@@ -7,6 +7,40 @@ services:
   #     - "5672:5672"
   #     - "15672:15672"
 
+  postgres-db3:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: monitor_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - db-data1:/var/lib/postgresql/data
+
+  monitoring-service:
+    build: 
+      context: ./monitoring-service
+      dockerfile: ./Dockerfile
+    restart: always
+    ports:
+      - "8082:8082" # Adjusted to avoid potential port conflicts
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db3:5432/monitor_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      - postgres-db3
+      - rabbitmq
+
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
   frontend-react:
     build:
       context: ./react-demo-docker_production
@@ -79,12 +113,16 @@ services:
   #   image: rabbit-microservice
   #   restart: always
   #   build:
-  #     context: ./sensorTransmissions-service
+  #     context: ./monitoring-service
   #     dockerfile: Dockerfile
   #   ports:
-  #     - "5000:5001"
+  #     - "8082:8082"
   #   environment:
-  #     - FLASK_ENV=development
+  #     #- FLASK_ENV=development
+  #     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-devices:5432/monitorr_db
+  #     SPRING_DATASOURCE_USERNAME: postgres
+  #     SPRING_DATASOURCE_PASSWORD: postgres
+  #     SPRING_JPA_HIBERNATE_DDL_AUTO: update
   #   depends_on:
   #     - postgres-mon
   #     - rabbitmq
@@ -95,7 +133,7 @@ services:
   #   environment:
   #     POSTGRES_USER: postgres
   #     POSTGRES_PASSWORD: postgres
-  #     POSTGRES_DB: monitor_db
+  #     POSTGRES_DB: monitorr_db
   #   ports:
   #     - "5435:5432"
   #   volumes:
@@ -134,5 +172,6 @@ services:
 volumes:
   db-data-devices:
   db-data-users:
+  db-data1:
   #db-data-mon:
   chat-data:

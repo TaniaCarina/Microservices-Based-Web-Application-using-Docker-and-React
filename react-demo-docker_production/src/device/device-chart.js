@@ -14,6 +14,13 @@ const DeviceChart = () => {
     const chartRef = useRef(null);
     const chartInstanceRef = useRef(null);
     const clientRef = useRef(null);
+    const [connected, setConnected] = useState(false);
+
+    const processMessage = (message) => {
+        const data = JSON.parse(message.body);
+        console.log("Received message:", data);
+        // Handle your message here
+      };
 
     useEffect(() => {
         if (date) {
@@ -38,25 +45,50 @@ const getNewMeasurements = () => {
   const dateObj = new Date(date);
   const formattedDate = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
 
-  const client = new Client({
-      brokerURL: "ws://localhost:8082/measurements",  // Adjust URL if necessary
-      connectHeaders: {},
-      onConnect: () => {
-          client.subscribe("/topic/measurements", (message) => {
-              const receivedMessage = JSON.parse(message.body);
-              setMeasurements(receivedMessage);
-          });
+//   const client = new Client({
+//       brokerURL: "ws://localhost:8082/measurements",  // Adjust URL if necessary
+//       connectHeaders: {},
+//       onConnect: () => {
+//           client.subscribe("/topic/measurements", (message) => {
+//               const receivedMessage = JSON.parse(message.body);
+//               setMeasurements(receivedMessage);
+//           });
 
-          client.publish({
-              destination: "/app/sendMeasurement",
-              body: JSON.stringify({
-                  deviceUuid: deviceUuid,
-                  date: formattedDate,
-              }),
-          });
-      },
-      // Add handlers for other client events as needed
+//           client.publish({
+//               destination: "/app/sendMeasurement",
+//               body: JSON.stringify({
+//                   deviceUuid: deviceUuid,
+//                   date: formattedDate,
+//               }),
+//           });
+//       },
+//       // Add handlers for other client events as needed
+//   });
+
+const client = new Client({
+    brokerURL: 'ws://localhost:8082/measurements'
   });
+
+  client.onConnect = (frame) => {
+      setConnected(true);
+      console.log('Connected: ' + frame);
+      client.subscribe('/topic/notifications', (message) => {
+          processMessage(message);
+      });
+      client.publish({
+          destination: "/app/hello",
+          body: 'test',
+      });
+  };
+
+  client.onWebSocketError = (error) => {
+    console.error('Error with monitoring websocket', error);
+};
+
+client.onStompError = (frame) => {
+        console.error('Broker reported error: ' + frame.headers['message']);
+        console.error('Additional details: ' + frame.body);
+    };
 
   client.activate();
   clientRef.current = client;
