@@ -15,12 +15,24 @@ const DeviceChart = () => {
     const chartInstanceRef = useRef(null);
     const clientRef = useRef(null);
     const [connected, setConnected] = useState(false);
+    const [notification, setNotification] = useState(null); // State for popup notification
+
 
     const processMessage = (message) => {
         const data = JSON.parse(message.body);
         console.log("Received message:", data);
-        // Handle your message here
+        const notificationMessage = `Device UUID: ${data.deviceUuid}, Max Hourly Consumption: ${data.maxHourlyConsumption}, Total Consumption: ${data.totalConsumption}`;
+        setNotification(notificationMessage); 
+        // setNotification(data.message);
+        // console.log("Notification message:", data.message);
       };
+
+      useEffect(() => {
+        if (notification) {
+            const timer = setTimeout(() => setNotification(null), 30000); 
+            return () => clearTimeout(timer);
+        }
+    }, [notification]);  
 
     useEffect(() => {
         if (date) {
@@ -75,10 +87,21 @@ const client = new Client({
       client.subscribe('/topic/notifications', (message) => {
           processMessage(message);
       });
+      client.subscribe("/topic/measurements", (message) => {
+                      const receivedMessage = JSON.parse(message.body);
+                      setMeasurements(receivedMessage);
+                  });
       client.publish({
-          destination: "/app/hello",
-          body: 'test',
-      });
+            destination: "/app/sendMeasurement",
+                body: JSON.stringify({
+                    deviceUuid: deviceUuid,
+                    date: formattedDate,
+                }),
+     });
+    //   client.publish({
+    //       destination: "/app/hello",
+    //       body: 'test',
+    //   });
   };
 
   client.onWebSocketError = (error) => {
@@ -112,8 +135,8 @@ client.onStompError = (frame) => {
             datasets: [{
                 label: 'Hourly Differences',
                 data: hourlyDifferencesData,
-                backgroundColor: 'rgba(75, 192, 192, 0.6)',
-                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'rgba(173, 124, 253, 0.6)',
+                borderColor: 'rgb(66, 5, 78)',
                 borderWidth: 1,
             }],
         };
@@ -158,6 +181,23 @@ client.onStompError = (frame) => {
             <label htmlFor="datePicker">Pick a date: </label>
             <input type="date" id="datePicker" value={date || ''} onChange={(e) => setDate(e.target.value)} />
             <canvas ref={chartRef} width="400" height="200"></canvas>
+            {/* Popup Notification */}
+            {notification && (
+            <div
+                style={{
+                    position: 'fixed',
+                    bottom: '20px',
+                    right: '20px',
+                    backgroundColor: 'rgba(74, 0, 114, 0.8)',
+                    color: 'white',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    zIndex: 1000,
+                }}
+            >
+                <p>{notification}</p>
+            </div>
+        )}
         </div>
     );
 };

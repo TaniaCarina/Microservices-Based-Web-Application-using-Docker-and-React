@@ -29,7 +29,7 @@ public class ConsumptionServiceImpl implements ConsumptionService {
 
     @Scheduled(fixedRate = 60000)
     public void updateConsumption() {
-        List<Device> devices = deviceRepository.findAll(); // Fetch all devices
+        List<Device> devices = deviceRepository.findAll();
         for(Device device : devices) {
             ArrayList<Measurement> lastSixMeasurements = measurementRepository.findTop6ByDeviceUuidOrderByTimestampDesc(device.uuid);
             double totalConsumption = lastSixMeasurements.get(0).value - lastSixMeasurements.get(5).value;

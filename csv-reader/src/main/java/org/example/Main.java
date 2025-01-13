@@ -15,7 +15,6 @@ import java.time.format.DateTimeFormatter;
 public class Main {
     public static void main(String[] args) {
         String deviceId = args[0];
-        //String deviceId = "afdf4497-1b18-4687-a810-2ea3e4c8294a";
 
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost("localhost"); // RabbitMQ server host
